@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Literal
 from typing import Optional
 from typing import Union
-from typing import assert_never
+from typing_extensions import assert_never
 
 import attr
 import pytest
@@ -36,7 +36,7 @@ class RichTerminalReporter:
 
     Status = Literal["collected", "running", "success", "fail", "error", "skipped", "xfailed", "xpassed"]
 
-    def __attrs_post_init__(self):
+    def __attrs_post_init__(self) -> None:
         self.collect_progress: Optional[Progress] = None
         self.runtest_progress: Optional[Progress] = None
         self.total_items_collected = 0
