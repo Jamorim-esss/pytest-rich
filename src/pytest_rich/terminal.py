@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Literal
 from typing import Optional
 from typing import Union
-from typing_extensions import assert_never
 
 import attr
 import pytest
@@ -21,6 +20,7 @@ from rich.progress import TaskID
 from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
+from typing_extensions import assert_never
 
 from pytest_rich.capture import save_terminal_output
 from pytest_rich.header import generate_header_panel
@@ -34,7 +34,16 @@ class RichTerminalReporter:
     config: pytest.Config
     console: Console = attr.Factory(Console)
 
-    Status = Literal["collected", "running", "success", "fail", "error", "skipped", "xfailed", "xpassed"]
+    Status = Literal[
+        "collected",
+        "running",
+        "success",
+        "fail",
+        "error",
+        "skipped",
+        "xfailed",
+        "xpassed",
+    ]
 
     def __attrs_post_init__(self) -> None:
         self.collect_progress: Optional[Progress] = None

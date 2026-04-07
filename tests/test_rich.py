@@ -1,5 +1,6 @@
 import pytest
 
+
 def test_outcomes(pytester):
     pytester.copy_example("test_basic.py")
 
@@ -28,6 +29,7 @@ def test_collect_error(pytester):
 
     without_rich.assert_outcomes(errors=1) == with_rich.assert_outcomes(errors=1)
 
+
 @pytest.fixture
 def rich_pytester(pytester):
     """Register the Rich reporter alongside the standard one.
@@ -48,29 +50,44 @@ def rich_pytester(pytester):
     return pytester
 
 
-@pytest.mark.parametrize("test_code, expected_outcomes, expected_ret", [
-    pytest.param(
-        '@pytest.mark.skip("TODO")\ndef test_it(): pass',
-        {"skipped": 1}, 0, id="skip-decorator",
-    ),
-    pytest.param(
-        'def test_it(): pytest.skip("not now")',
-        {"skipped": 1}, 0, id="skip-inline",
-    ),
-    pytest.param(
-        '@pytest.mark.xfail(reason="known bug")\ndef test_it(): assert False',
-        {"xfailed": 1}, 0, id="xfail",
-    ),
-    pytest.param(
-        '@pytest.mark.xfail(reason="unexpected")\ndef test_it(): assert True',
-        {"xpassed": 1}, 0, id="xpass",
-    ),
-    pytest.param(
-        '@pytest.mark.xfail(reason="must fail", strict=True)\ndef test_it(): assert True',
-        {"failed": 1}, 1, id="xpass-strict",
-    ),
-])
-def test_skip_xfail_do_not_crash(rich_pytester, test_code, expected_outcomes, expected_ret):
+@pytest.mark.parametrize(
+    "test_code, expected_outcomes, expected_ret",
+    [
+        pytest.param(
+            '@pytest.mark.skip("TODO")\ndef test_it(): pass',
+            {"skipped": 1},
+            0,
+            id="skip-decorator",
+        ),
+        pytest.param(
+            'def test_it(): pytest.skip("not now")',
+            {"skipped": 1},
+            0,
+            id="skip-inline",
+        ),
+        pytest.param(
+            '@pytest.mark.xfail(reason="known bug")\ndef test_it(): assert False',
+            {"xfailed": 1},
+            0,
+            id="xfail",
+        ),
+        pytest.param(
+            '@pytest.mark.xfail(reason="unexpected")\ndef test_it(): assert True',
+            {"xpassed": 1},
+            0,
+            id="xpass",
+        ),
+        pytest.param(
+            '@pytest.mark.xfail(reason="must fail", strict=True)\ndef test_it(): assert True',
+            {"failed": 1},
+            1,
+            id="xpass-strict",
+        ),
+    ],
+)
+def test_skip_xfail_do_not_crash(
+    rich_pytester, test_code, expected_outcomes, expected_ret
+):
     rich_pytester.makepyfile(f"import pytest\n{test_code}")
     result = rich_pytester.runpytest()
     assert result.ret == expected_ret
