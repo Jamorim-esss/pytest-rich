@@ -2,10 +2,10 @@ import warnings
 from collections import defaultdict
 from collections.abc import Sequence
 from pathlib import Path
-from typing import ClassVar
 from typing import Literal
 from typing import Optional
 from typing import Union
+from typing import assert_never
 
 import attr
 import pytest
@@ -127,19 +127,24 @@ class RichTerminalReporter:
 
         self._update_task(nodeid)
 
-    _STATUS_CHARS: ClassVar[dict[Status, str]] = {
-        "collected": "",
-        "running": "",
-        "success": "[green]✔[/green]",
-        "fail": "[red]❌[/red]",
-        "error": "[red]E[/red]",
-        "skipped": "[yellow]s[/yellow]",
-        "xfailed": "[yellow]x[/yellow]",
-        "xpassed": "[yellow]X[/yellow]",
-    }
-
     def _get_status_char(self, status: Status) -> str:
-        return self._STATUS_CHARS[status]
+        match status:
+            case "collected" | "running":
+                return ""
+            case "success":
+                return "[green]✔[/green]"
+            case "fail":
+                return "[red]❌[/red]"
+            case "error":
+                return "[red]E[/red]"
+            case "skipped":
+                return "[yellow]s[/yellow]"
+            case "xfailed":
+                return "[yellow]x[/yellow]"
+            case "xpassed":
+                return "[yellow]X[/yellow]"
+            case unreachable:
+                assert_never(unreachable)
 
     def _update_task(self, nodeid: str):
         base_fn = nodeid.split("::")[0]
