@@ -2,6 +2,7 @@ import warnings
 from collections import defaultdict
 from collections.abc import Sequence
 from pathlib import Path
+from typing import ClassVar
 from typing import Literal
 from typing import Optional
 from typing import Union
@@ -33,7 +34,7 @@ class RichTerminalReporter:
     config: pytest.Config
     console: Console = attr.Factory(Console)
 
-    Status = Literal["collected", "running", "success", "fail", "error"]
+    Status = Literal["collected", "running", "success", "fail", "error", "skipped", "xfailed", "xpassed"]
 
     def __attrs_post_init__(self):
         self.collect_progress: Optional[Progress] = None
@@ -49,8 +50,8 @@ class RichTerminalReporter:
         self.total_duration: float = 0
         self.console.record = self.config.getoption("rich_capture") is not None
 
-    def _preserve_report(self, report) -> None:
-        self.categorized_reports[report.outcome].append(report)
+    def _preserve_report(self, report, category: str) -> None:
+        self.categorized_reports[category].append(report)
         self.total_duration += report.duration
 
     def pytest_collection(self) -> None:
@@ -126,20 +127,19 @@ class RichTerminalReporter:
 
         self._update_task(nodeid)
 
+    _STATUS_CHARS: ClassVar[dict[Status, str]] = {
+        "collected": "",
+        "running": "",
+        "success": "[green]✔[/green]",
+        "fail": "[red]❌[/red]",
+        "error": "[red]E[/red]",
+        "skipped": "[yellow]s[/yellow]",
+        "xfailed": "[yellow]x[/yellow]",
+        "xpassed": "[yellow]X[/yellow]",
+    }
+
     def _get_status_char(self, status: Status) -> str:
-        # ["collected", "running", "success", "fail", "error"]
-        if status == "collected":
-            return ""
-        elif status == "running":
-            return ""
-        elif status == "success":
-            return "[green]✔[/green]"
-        elif status == "fail":
-            return "[red]❌[/red]"
-        elif status == "error":
-            return "[red]E[/red]"
-        else:
-            assert 0
+        return self._STATUS_CHARS[status]
 
     def _update_task(self, nodeid: str):
         base_fn = nodeid.split("::")[0]
@@ -153,7 +153,7 @@ class RichTerminalReporter:
             status = self.status_per_item[item.nodeid]
             statuses.append(status)
             chars.append(self._get_status_char(status))
-        completed_count = [x for x in statuses if x in ("success", "fail")]
+        completed_count = [x for x in statuses if x not in ("collected", "running")]
         completed = len(completed_count) == len(items)
         percent = len(completed_count) * 100 // len(items)
         description = f"[cyan][{percent:3d}%] [/cyan]{base_fn} " + "".join(chars)
@@ -169,10 +169,37 @@ class RichTerminalReporter:
     def pytest_runtest_logreport(self, report: pytest.TestReport) -> None:
         status: Optional[RichTerminalReporter.Status] = None
         if report.when == "setup":
-            status = "running"
+            if report.skipped:
+                if hasattr(report, "wasxfail"):
+                    status = "xfailed"
+                    category = "xfailed"
+                else:
+                    status = "skipped"
+                    category = "skipped"
+                self._preserve_report(report, category)
+            else:
+                status = "running"
         elif report.when == "call":
-            status = "success" if report.outcome == "passed" else "fail"
-            self._preserve_report(report)
+            if hasattr(report, "wasxfail"):
+                if report.skipped:
+                    status = "xfailed"
+                    category = "xfailed"
+                elif report.passed:
+                    status = "xpassed"
+                    category = "xpassed"
+                else:
+                    status = "fail"
+                    category = "failed"
+            elif report.passed:
+                status = "success"
+                category = "passed"
+            elif report.skipped:
+                status = "skipped"
+                category = "skipped"
+            else:
+                status = "fail"
+                category = "failed"
+            self._preserve_report(report, category)
         if status is not None:
             self.status_per_item[report.nodeid] = status
             self._update_task(report.nodeid)
@@ -200,10 +227,24 @@ class RichTerminalReporter:
                 if index == 0:
                     self.console.print(Rule("FAILURES\n", style="bold red"))
                 nodeid = report.nodeid
-                assert isinstance(report.longrepr, ExceptionChainRepr)
-                tb = RichExceptionChainRepr(nodeid, report.longrepr)
-                error_messages[nodeid] = tb.error_messages
-                self.console.print(tb)
+                if isinstance(report.longrepr, ExceptionChainRepr):
+                    tb = RichExceptionChainRepr(nodeid, report.longrepr)
+                    error_messages[nodeid] = tb.error_messages
+                    self.console.print(tb)
+                else:
+                    if isinstance(report.longrepr, tuple):
+                        _, _, msg = report.longrepr
+                    else:
+                        msg = str(report.longrepr)
+                    error_messages[nodeid] = [msg]
+                    self.console.print(
+                        Text.assemble(
+                            ("FAILED ", "bold red"),
+                            (nodeid, "magenta"),
+                            ": ",
+                            msg,
+                        )
+                    )
 
             if self.verbosity_level >= 0:
                 self.print_summary(error_messages)
@@ -243,6 +284,8 @@ class RichTerminalReporter:
             "passed": "bold green",
             "failed": "bold red",
             "skipped": "bold yellow",
+            "xfailed": "bold yellow",
+            "xpassed": "bold yellow",
         }
         for state, reports in self.categorized_reports.items():
             no_of_items = len(reports)
