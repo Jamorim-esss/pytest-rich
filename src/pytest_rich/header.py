@@ -1,6 +1,5 @@
 import sys
 from collections.abc import Iterable
-from typing import Union
 
 import pytest
 from _pytest.main import Session
@@ -41,7 +40,7 @@ def _generate_root_col(session: Session) -> Columns:
     return Columns([f"root [cyan][bold]{session.config.rootpath}"])
 
 
-def _generate_plugins_col(session: Session) -> Union[Columns, None]:
+def _generate_plugins_col(session: Session) -> Columns | None:
     plugins = session.config.pluginmanager.list_plugin_distinfo()
 
     if plugins is None:

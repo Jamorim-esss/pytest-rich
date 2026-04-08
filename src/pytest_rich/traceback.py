@@ -1,6 +1,5 @@
 import ast
 from collections.abc import Sequence
-from typing import Optional
 
 import attr
 from _pytest._code.code import ExceptionChainRepr
@@ -44,7 +43,7 @@ class RichExceptionChainRepr:
     nodeid: str
     chain: ExceptionChainRepr
     extra_lines: int = 3
-    theme: Optional[str] = "ansi_dark"
+    theme: str | None = "ansi_dark"
     word_wrap: bool = True
     indent_guides: bool = True
     error_messages: list = []
