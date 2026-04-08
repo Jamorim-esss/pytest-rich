@@ -3,6 +3,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
+from typing import assert_never
 
 import attr
 import pytest
@@ -18,7 +19,6 @@ from rich.progress import TaskID
 from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
-from typing import assert_never
 
 from pytest_rich.capture import save_terminal_output
 from pytest_rich.header import generate_header_panel
