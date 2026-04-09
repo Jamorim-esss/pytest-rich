@@ -91,8 +91,10 @@ class RichExceptionChainRepr:
 
         path_highlighter = PathHighlighter()
         for entry in self.chain.reprtraceback.reprentries:
-            assert isinstance(entry, ReprEntry)
-            assert isinstance(entry.reprfileloc, ReprFileLocation)
+            if not isinstance(entry, ReprEntry):
+                continue
+            if entry.reprfileloc is None:
+                continue
             if entry.reprfileloc.message:
                 yield Text.assemble(
                     path_highlighter(
@@ -182,8 +184,10 @@ class RichExceptionChainRepr:
             return err_lines
 
         for last, entry in loop_last(chain.reprtraceback.reprentries):
-            assert isinstance(entry, ReprEntry)
-            assert entry.reprfileloc is not None
+            if not isinstance(entry, ReprEntry):
+                continue
+            if entry.reprfileloc is None:
+                continue
             filename = entry.reprfileloc.path
             lineno = entry.reprfileloc.lineno
             funcname = get_funcname(lineno, filename)
@@ -199,10 +203,10 @@ class RichExceptionChainRepr:
             )
             yield text
 
-            assert entry.reprfuncargs is not None
-            args = get_args(entry.reprfuncargs)
-            if args:
-                yield args
+            if entry.reprfuncargs is not None:
+                args = get_args(entry.reprfuncargs)
+                if args:
+                    yield args
 
             code = read_code(filename)
             syntax = Syntax(
