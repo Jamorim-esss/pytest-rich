@@ -3,7 +3,10 @@ from collections import defaultdict
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
-from typing import assert_never
+from typing import Optional
+from typing import Union
+
+from typing_extensions import assert_never
 
 import attr
 import pytest
@@ -44,8 +47,8 @@ class RichTerminalReporter:
     ]
 
     def __attrs_post_init__(self) -> None:
-        self.collect_progress: Progress | None = None
-        self.runtest_progress: Progress | None = None
+        self.collect_progress: Optional[Progress] = None
+        self.runtest_progress: Optional[Progress] = None
         self.total_items_collected = 0
         self.total_items_completed = 0
         self.items_per_file: dict[Path, list[pytest.Item]] = {}
@@ -53,7 +56,7 @@ class RichTerminalReporter:
         self.items: dict[str, pytest.Item] = {}
         self.runtest_tasks_per_file: dict[Path, TaskID] = {}
         self.categorized_reports: dict[str, list[pytest.TestReport]] = defaultdict(list)
-        self.summary: Live | None = None
+        self.summary: Optional[Live] = None
         self.total_duration: float = 0
         self.console.record = self.config.getoption("rich_capture") is not None
 
@@ -114,7 +117,7 @@ class RichTerminalReporter:
     def pytest_plugin_registered(self, plugin) -> None: ...
 
     def pytest_runtest_logstart(
-        self, nodeid: str, location: tuple[str, int | None, str]
+        self, nodeid: str, location: tuple[str, Optional[int], str]
     ) -> None:
         if self.runtest_progress is None:
             self.runtest_progress = Progress(SpinnerColumn(), "{task.description}")
@@ -179,7 +182,7 @@ class RichTerminalReporter:
             )
 
     def pytest_runtest_logreport(self, report: pytest.TestReport) -> None:
-        status: RichTerminalReporter.Status | None = None
+        status: Optional[RichTerminalReporter.Status] = None
         if report.when == "setup":
             if report.skipped:
                 if hasattr(report, "wasxfail"):
@@ -226,7 +229,7 @@ class RichTerminalReporter:
             )
 
     def pytest_sessionfinish(
-        self, session: pytest.Session, exitstatus: int | pytest.ExitCode
+        self, session: pytest.Session, exitstatus: Union[int, pytest.ExitCode]
     ):
         if self.runtest_progress is not None:
             self.runtest_progress.stop()
