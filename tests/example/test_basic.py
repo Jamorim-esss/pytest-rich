@@ -71,7 +71,9 @@ def test_doubly_nested_failures():
     def inner():
         def inner_inner():
             assert False
+
         inner_inner()
+
     inner()
 
 
@@ -80,8 +82,11 @@ def test_triply_nested_failures():
         def inner_inner():
             def inner_inner_inner():
                 assert False
+
             inner_inner_inner()
+
         inner_inner()
+
     inner()
 
 

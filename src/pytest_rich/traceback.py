@@ -5,7 +5,6 @@ from typing import Optional
 import attr
 from _pytest._code.code import ExceptionChainRepr
 from _pytest._code.code import ReprEntry
-from _pytest._code.code import ReprFileLocation
 from _pytest._code.code import ReprFuncArgs
 from pygments.token import Comment
 from pygments.token import Keyword
