@@ -67,27 +67,27 @@ def test_nested_failure():
     inner()
 
 
-# These two tests raise an `AssertionError`, so they are commented out
-# for now. They will be uncommented once the `AssertionError` is
-# handled.
-# Related issue: https://github.com/nicoddemus/pytest-rich/issues/44
+def test_doubly_nested_failures():
+    def inner():
+        def inner_inner():
+            assert False
 
-# def test_doubly_nested_failures():
-#     def inner():
-#         def inner_inner():
-#             assert False
-#         inner_inner()
-#     inner()
+        inner_inner()
+
+    inner()
 
 
-# def test_triply_nested_failures():
-#     def inner():
-#         def inner_inner():
-#             def inner_inner_inner():
-#                 assert False
-#             inner_inner_inner()
-#         inner_inner()
-#     inner()
+def test_triply_nested_failures():
+    def inner():
+        def inner_inner():
+            def inner_inner_inner():
+                assert False
+
+            inner_inner_inner()
+
+        inner_inner()
+
+    inner()
 
 
 def test_warning():

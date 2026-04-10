@@ -1,13 +1,33 @@
 import pytest
 
 
+@pytest.fixture
+def rich_pytester(pytester):
+    """Register the Rich reporter alongside the standard one.
+
+    Using ``--rich`` is not enough because pytester captures stdout,
+    so ``sys.stdout.isatty()`` returns False and the plugin never activates.
+    """
+    pytester.makeconftest("""
+        import pytest
+        from pytest_rich.terminal import RichTerminalReporter
+
+        @pytest.hookimpl(trylast=True)
+        def pytest_configure(config):
+            config.pluginmanager.register(
+                RichTerminalReporter(config), "rich-terminal-reporter"
+            )
+    """)
+    return pytester
+
+
 def test_outcomes(pytester):
     pytester.copy_example("test_basic.py")
 
     outcomes = {
         "passed": 3,
         "skipped": 4,
-        "failed": 2,
+        "failed": 4,
         "errors": 2,
         "xpassed": 1,
         "xfailed": 3,
@@ -28,26 +48,6 @@ def test_collect_error(pytester):
     with_rich = pytester.runpytest("--rich")
 
     without_rich.assert_outcomes(errors=1) == with_rich.assert_outcomes(errors=1)
-
-
-@pytest.fixture
-def rich_pytester(pytester):
-    """Register the Rich reporter alongside the standard one.
-
-    Using ``--rich`` is not enough because pytester captures stdout,
-    so ``sys.stdout.isatty()`` returns False and the plugin never activates.
-    """
-    pytester.makeconftest("""
-        import pytest
-        from pytest_rich.terminal import RichTerminalReporter
-
-        @pytest.hookimpl(trylast=True)
-        def pytest_configure(config):
-            config.pluginmanager.register(
-                RichTerminalReporter(config), "rich-terminal-reporter"
-            )
-    """)
-    return pytester
 
 
 @pytest.mark.parametrize(
@@ -92,4 +92,50 @@ def test_skip_xfail_do_not_crash(
     result = rich_pytester.runpytest()
     assert result.ret == expected_ret
     result.assert_outcomes(**expected_outcomes)
+    result.stdout.fnmatch_lines(["*Summary*"])
+
+
+@pytest.mark.parametrize(
+    "test_code",
+    [
+        pytest.param(
+            """
+def test_nested():
+    def inner():
+        assert False
+    inner()
+""",
+            id="one-level",
+        ),
+        pytest.param(
+            """
+def test_nested():
+    def inner():
+        def inner_inner():
+            assert False
+        inner_inner()
+    inner()
+""",
+            id="two-levels",
+        ),
+        pytest.param(
+            """
+def test_nested():
+    def inner():
+        def inner_inner():
+            def inner_inner_inner():
+                assert False
+            inner_inner_inner()
+        inner_inner()
+    inner()
+""",
+            id="three-levels",
+        ),
+    ],
+)
+def test_nested_function_failures(rich_pytester, test_code):
+    rich_pytester.makepyfile(test_code)
+    result = rich_pytester.runpytest()
+    assert result.ret == 1
+    result.assert_outcomes(failed=1)
     result.stdout.fnmatch_lines(["*Summary*"])
