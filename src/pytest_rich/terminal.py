@@ -10,7 +10,6 @@ import attr
 import pytest
 from _pytest._code.code import ExceptionChainRepr
 from _pytest._code.code import ExceptionRepr
-from _pytest.reports import CollectErrorRepr
 from rich.console import Console
 from rich.live import Live
 from rich.padding import Padding
@@ -91,9 +90,13 @@ class RichTerminalReporter:
 
     def pytest_collection_finish(self, session: pytest.Session) -> None:
         if self.collect_progress is not None:
+            error_suffix = ""
+            if self.collection_errors:
+                n = len(self.collection_errors)
+                error_suffix = f" [red]/ {n} errors" if n > 1 else " [red]/ 1 error"
             self.collect_progress.update(
                 self.collect_task,
-                description=f"[cyan][bold]Collected [green]{self.total_items_collected} [cyan]items",
+                description=f"[cyan][bold]Collected [green]{self.total_items_collected} [cyan]items{error_suffix}",
                 completed=True,
             )
             self.collect_progress.stop()
@@ -239,17 +242,16 @@ class RichTerminalReporter:
             self.runtest_progress = None
             self.runtest_tasks_per_file.clear()
 
-        # Collection errors are always shown regardless of no_summary.
-        for index, report in enumerate(self.collection_errors):
-            if index == 0:
-                self.console.print(Rule("ERRORS", style="bold red"))
-            self.console.print(
-                Text(f"ERROR collecting {report.nodeid}", style="bold red")
-            )
-            if isinstance(report.longrepr, CollectErrorRepr):
-                self.console.print(Text(report.longrepr.longrepr, style="red"))
-            elif report.longrepr is not None:
-                self.console.print(Text(str(report.longrepr), style="red"))
+        if self.collection_errors:
+            self.console.print(Rule("ERRORS", style="bold red"))
+            for report in self.collection_errors:
+                self.console.print(
+                    Text(f"ERROR collecting {report.nodeid}", style="bold red")
+                )
+                if hasattr(report.longrepr, "longrepr"):
+                    self.console.print(Text(report.longrepr.longrepr, style="red"))
+                elif report.longrepr is not None:
+                    self.console.print(Text(str(report.longrepr), style="red"))
 
         if self.no_summary is False:
             error_messages = {}
@@ -276,7 +278,7 @@ class RichTerminalReporter:
                         )
                     )
 
-            if self.verbosity_level >= 0:
+            if self.verbosity_level >= 0 and self.total_items_completed > 0:
                 self.print_summary(error_messages)
 
         status = "SUCCEEDED" if exitstatus == 0 else "FAILED"
@@ -320,16 +322,14 @@ class RichTerminalReporter:
         for state, reports in self.categorized_reports.items():
             no_of_items = len(reports)
             if no_of_items > 0:
-                percentage = (
-                    f"({100 * no_of_items / self.total_items_completed:.1f}%)"
-                    if self.total_items_completed > 0
-                    else ""
-                )
                 summary_table.add_row(
                     Padding(str(no_of_items), pad=HORIZONTAL_PAD),
                     Padding(state.title(), pad=HORIZONTAL_PAD),
-                    Padding(percentage, pad=HORIZONTAL_PAD),
-                    style=style_dict.get(state, "bold red"),
+                    Padding(
+                        f"({100 * no_of_items / self.total_items_completed:.1f}%)",
+                        pad=HORIZONTAL_PAD,
+                    ),
+                    style=style_dict[state],
                 )
 
         if self.collection_errors:

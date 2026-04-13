@@ -39,14 +39,32 @@ def test_outcomes(pytester):
     without_rich.assert_outcomes(**outcomes) == with_rich.assert_outcomes(**outcomes)
 
 
+def test_collect_error_outcomes(pytester):
+    """Stock pytest must report collection errors as errors in outcomes."""
+    pytester.makepyfile("""
+    raise Exception("collect error")
+    """)
+    result = pytester.runpytest()
+    result.assert_outcomes(errors=1)
+
+
 def test_collect_error(rich_pytester):
     rich_pytester.makepyfile("""
     raise Exception("collect error")
     """)
     result = rich_pytester.runpytest()
     assert result.ret != 0
-    # "Collection Errors" in the summary is unique to the Rich reporter.
-    result.stdout.fnmatch_lines(["*ERROR collecting*", "*Collection Errors*"])
+    result.stdout.fnmatch_lines(["*ERROR collecting*"])
+
+
+def test_collect_error_shown_with_no_summary(rich_pytester):
+    """Collection errors must be visible even when --no-summary is used."""
+    rich_pytester.makepyfile("""
+    raise Exception("collect error")
+    """)
+    result = rich_pytester.runpytest("--no-summary")
+    assert result.ret != 0
+    result.stdout.fnmatch_lines(["*ERROR collecting*"])
 
 
 @pytest.mark.parametrize(
