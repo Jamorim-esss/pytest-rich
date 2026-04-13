@@ -10,6 +10,7 @@ import attr
 import pytest
 from _pytest._code.code import ExceptionChainRepr
 from _pytest._code.code import ExceptionRepr
+from _pytest.reports import CollectErrorRepr
 from rich.console import Console
 from rich.live import Live
 from rich.padding import Padding
@@ -56,6 +57,7 @@ class RichTerminalReporter:
         self.runtest_tasks_per_file: dict[Path, TaskID] = {}
         self.categorized_reports: dict[str, list[pytest.TestReport]] = defaultdict(list)
         self.summary: Optional[Live] = None
+        self.collection_errors: list[pytest.CollectReport] = []
         self.total_duration: float = 0
         self.console.record = self.config.getoption("rich_capture") is not None
 
@@ -71,6 +73,8 @@ class RichTerminalReporter:
         self.collect_progress.start()
 
     def pytest_collectreport(self, report: pytest.CollectReport) -> None:
+        if report.failed:
+            self.collection_errors.append(report)
         items = [x for x in report.result if isinstance(x, pytest.Item)]
         if items:
             for item in items:
@@ -235,6 +239,18 @@ class RichTerminalReporter:
             self.runtest_progress = None
             self.runtest_tasks_per_file.clear()
 
+        # Collection errors are always shown regardless of no_summary.
+        for index, report in enumerate(self.collection_errors):
+            if index == 0:
+                self.console.print(Rule("ERRORS", style="bold red"))
+            self.console.print(
+                Text(f"ERROR collecting {report.nodeid}", style="bold red")
+            )
+            if isinstance(report.longrepr, CollectErrorRepr):
+                self.console.print(Text(report.longrepr.longrepr, style="red"))
+            elif report.longrepr is not None:
+                self.console.print(Text(str(report.longrepr), style="red"))
+
         if self.no_summary is False:
             error_messages = {}
             for index, report in enumerate(self.categorized_reports["failed"]):
@@ -304,22 +320,28 @@ class RichTerminalReporter:
         for state, reports in self.categorized_reports.items():
             no_of_items = len(reports)
             if no_of_items > 0:
-                summary_table.add_row(
-                    Padding(
-                        str(no_of_items),
-                        pad=HORIZONTAL_PAD,
-                    ),
-                    Padding(
-                        state.title(),
-                        pad=HORIZONTAL_PAD,
-                    ),
-                    Padding(
-                        f"({100 * no_of_items / self.total_items_completed:.1f}%)",
-                        pad=HORIZONTAL_PAD,
-                    ),
-                    #
-                    style=style_dict[state],
+                percentage = (
+                    f"({100 * no_of_items / self.total_items_completed:.1f}%)"
+                    if self.total_items_completed > 0
+                    else ""
                 )
+                summary_table.add_row(
+                    Padding(str(no_of_items), pad=HORIZONTAL_PAD),
+                    Padding(state.title(), pad=HORIZONTAL_PAD),
+                    Padding(percentage, pad=HORIZONTAL_PAD),
+                    style=style_dict.get(state, "bold red"),
+                )
+
+        if self.collection_errors:
+            summary_table.add_row(
+                Padding(
+                    str(len(self.collection_errors)),
+                    pad=HORIZONTAL_PAD,
+                ),
+                Padding("Collection Errors", pad=HORIZONTAL_PAD),
+                Padding("", pad=HORIZONTAL_PAD),
+                style="bold red",
+            )
 
         if self.verbose is True:
             for nodeid, status in self.status_per_item.items():

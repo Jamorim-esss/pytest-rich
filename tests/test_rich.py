@@ -39,15 +39,14 @@ def test_outcomes(pytester):
     without_rich.assert_outcomes(**outcomes) == with_rich.assert_outcomes(**outcomes)
 
 
-def test_collect_error(pytester):
-    pytester.makepyfile("""
+def test_collect_error(rich_pytester):
+    rich_pytester.makepyfile("""
     raise Exception("collect error")
     """)
-
-    without_rich = pytester.runpytest()
-    with_rich = pytester.runpytest("--rich")
-
-    without_rich.assert_outcomes(errors=1) == with_rich.assert_outcomes(errors=1)
+    result = rich_pytester.runpytest()
+    assert result.ret != 0
+    # "Collection Errors" in the summary is unique to the Rich reporter.
+    result.stdout.fnmatch_lines(["*ERROR collecting*", "*Collection Errors*"])
 
 
 @pytest.mark.parametrize(
