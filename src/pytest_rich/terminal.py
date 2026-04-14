@@ -56,6 +56,7 @@ class RichTerminalReporter:
         self.runtest_tasks_per_file: dict[Path, TaskID] = {}
         self.categorized_reports: dict[str, list[pytest.TestReport]] = defaultdict(list)
         self.summary: Optional[Live] = None
+        self.collection_errors: list[pytest.CollectReport] = []
         self.total_duration: float = 0
         self.console.record = self.config.getoption("rich_capture") is not None
 
@@ -71,6 +72,8 @@ class RichTerminalReporter:
         self.collect_progress.start()
 
     def pytest_collectreport(self, report: pytest.CollectReport) -> None:
+        if report.failed:
+            self.collection_errors.append(report)
         items = [x for x in report.result if isinstance(x, pytest.Item)]
         if items:
             for item in items:
@@ -87,9 +90,13 @@ class RichTerminalReporter:
 
     def pytest_collection_finish(self, session: pytest.Session) -> None:
         if self.collect_progress is not None:
+            error_suffix = ""
+            if self.collection_errors:
+                n = len(self.collection_errors)
+                error_suffix = f" [red]/ {n} errors" if n > 1 else " [red]/ 1 error"
             self.collect_progress.update(
                 self.collect_task,
-                description=f"[cyan][bold]Collected [green]{self.total_items_collected} [cyan]items",
+                description=f"[cyan][bold]Collected [green]{self.total_items_collected} [cyan]items{error_suffix}",
                 completed=True,
             )
             self.collect_progress.stop()
@@ -235,6 +242,17 @@ class RichTerminalReporter:
             self.runtest_progress = None
             self.runtest_tasks_per_file.clear()
 
+        if self.collection_errors:
+            self.console.print(Rule("ERRORS", style="bold red"))
+            for report in self.collection_errors:
+                self.console.print(
+                    Text(f"ERROR collecting {report.nodeid}", style="bold red")
+                )
+                if hasattr(report.longrepr, "longrepr"):
+                    self.console.print(Text(report.longrepr.longrepr, style="red"))
+                elif report.longrepr is not None:
+                    self.console.print(Text(str(report.longrepr), style="red"))
+
         if self.no_summary is False:
             error_messages = {}
             for index, report in enumerate(self.categorized_reports["failed"]):
@@ -260,7 +278,7 @@ class RichTerminalReporter:
                         )
                     )
 
-            if self.verbosity_level >= 0:
+            if self.verbosity_level >= 0 and self.total_items_completed > 0:
                 self.print_summary(error_messages)
 
         status = "SUCCEEDED" if exitstatus == 0 else "FAILED"
@@ -305,21 +323,25 @@ class RichTerminalReporter:
             no_of_items = len(reports)
             if no_of_items > 0:
                 summary_table.add_row(
-                    Padding(
-                        str(no_of_items),
-                        pad=HORIZONTAL_PAD,
-                    ),
-                    Padding(
-                        state.title(),
-                        pad=HORIZONTAL_PAD,
-                    ),
+                    Padding(str(no_of_items), pad=HORIZONTAL_PAD),
+                    Padding(state.title(), pad=HORIZONTAL_PAD),
                     Padding(
                         f"({100 * no_of_items / self.total_items_completed:.1f}%)",
                         pad=HORIZONTAL_PAD,
                     ),
-                    #
                     style=style_dict[state],
                 )
+
+        if self.collection_errors:
+            summary_table.add_row(
+                Padding(
+                    str(len(self.collection_errors)),
+                    pad=HORIZONTAL_PAD,
+                ),
+                Padding("Collection Errors", pad=HORIZONTAL_PAD),
+                Padding("", pad=HORIZONTAL_PAD),
+                style="bold red",
+            )
 
         if self.verbose is True:
             for nodeid, status in self.status_per_item.items():
