@@ -6,17 +6,8 @@ pytest_plugins = "pytester"
 
 
 @pytest.fixture
-def assert_rich_outcomes():
-    """Verify test outcomes by inspecting the Rich summary panel.
-
-    ``pytester.assert_outcomes`` relies on the standard pytest summary line
-    (``1 passed in 0.12s``) which the Rich reporter does not emit.  This
-    fixture returns a callable that checks the Rich summary panel lines
-    instead (e.g. ``│  1  Passed``).
-
-    Uses a double-space anchor so that ``passed=1`` does not accidentally
-    match ``│  11  Passed``.
-    """
+def assert_rich_outcomes() -> Callable[..., None]:
+    """Verify test outcomes by inspecting the Rich summary panel."""
     def _check(result: pytest.RunResult, **expected: int) -> None:
         for category, count in expected.items():
             label = category.title()

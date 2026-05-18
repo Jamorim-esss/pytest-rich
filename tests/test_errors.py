@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 
 def test_collect_error(rich_pytester):
     rich_pytester.makepyfile("""
@@ -21,30 +23,28 @@ def test_collect_error_shown_with_no_summary(rich_pytester):
 
 
 class TestSetupTeardownErrors:
+    # Setup errors fall into ``else: status = "running"`` at terminal.py:201
+    # and never reach ``categorized_reports``. Teardown errors are ignored
+    # entirely (no ``when == "teardown"`` branch in pytest_runtest_logreport).
+    # The xfail strict markers flip to unexpected-pass when those branches land.
 
-    def test_setup_error_does_not_crash(self, rich_pytester):
-        """The reporter must not crash on fixture lookup errors.
-
-        Note: the Rich reporter currently does NOT display setup errors
-        in the output (bug — setup failures are silently swallowed).
-        This will be addressed in Phase 2 (#74).
-        """
+    @pytest.mark.xfail(
+        strict=True, reason="Rich panel drops setup errors — terminal.py:201"
+    )
+    def test_setup_error_reported(self, rich_pytester, assert_rich_outcomes):
         rich_pytester.copy_example("test_basic.py")
         result = rich_pytester.runpytest("-k", "test_setup_error")
         assert result.ret != 0
-        result.stdout.fnmatch_lines(["*FAILED*"])
+        assert_rich_outcomes(result, errors=1)
 
-    def test_teardown_error_does_not_crash(self, rich_pytester):
-        """The reporter must not crash when a fixture teardown raises.
-
-        Note: the Rich reporter currently does NOT display teardown
-        errors — the test shows as passed despite the teardown failure.
-        This will be addressed in Phase 2 (#74).
-        """
+    @pytest.mark.xfail(
+        strict=True, reason="Rich panel drops teardown errors — terminal.py:190"
+    )
+    def test_teardown_error_reported(self, rich_pytester, assert_rich_outcomes):
         rich_pytester.copy_example("test_basic.py")
         result = rich_pytester.runpytest("-k", "test_teardown_error")
         assert result.ret != 0
-        result.stdout.fnmatch_lines(["*Summary*"])
+        assert_rich_outcomes(result, errors=1)
 
 
 class TestCollectionErrors:
